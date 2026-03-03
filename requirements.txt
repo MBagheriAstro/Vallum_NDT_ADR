@@ -1,0 +1,14 @@
+# Adafruit Motor HAT (PCA9685) on Jetson via I2C.
+# Requires I2C enabled and HAT on the 40-pin header.
+# Jetson.GPIO is required by Blinka for board detection on Jetson.
+Jetson.GPIO
+adafruit-blinka
+Adafruit-PlatformDetect
+adafruit-circuitpython-motorkit
+adafruit-circuitpython-pca9685
+adafruit-circuitpython-motor
+
+# Web application stack for Jetson dashboard
+fastapi
+uvicorn[standard]
+jinja2
