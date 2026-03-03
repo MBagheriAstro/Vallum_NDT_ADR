@@ -14,10 +14,8 @@ app = FastAPI(
 # where the process is started from (project root or webapp/).
 BASE_DIR = Path(__file__).resolve().parent
 STATIC_DIR = BASE_DIR / "static"
-ASSETS_DIR = BASE_DIR.parent  # project root (contains Vallum-Software-Logo.png)
 
 app.mount("/", StaticFiles(directory=STATIC_DIR, html=True), name="static")
-app.mount("/assets", StaticFiles(directory=ASSETS_DIR, html=False), name="assets")
 
 
 if __name__ == "__main__":
