@@ -36,22 +36,219 @@ const historyApi = {
   },
 };
 
-/* Stubs for Manual Control (wire to FastAPI when ready) */
-function controlActuator(_act, _dir) {}
-function retractAllActuators() {}
-function clearStage() {}
-function turnOnAllLights() {}
-function turnOffAllLights() {}
-function activateKickMotor() {}
-function activateFlipMotor() {}
-function applyConfiguration() {}
-function captureImage(_cam) {}
-function captureAllCamerasSequentially() {}
+/* Logs API client */
+const logsApi = {
+  async tail(limit = 200) {
+    const res = await fetch("/api/logs?limit=" + encodeURIComponent(limit));
+    if (!res.ok) return { success: false, lines: [] };
+    return res.json();
+  },
+};
+
+/* Lights API client (Jetson control_lights backend) */
+const lightsApi = {
+  async set(lightId, intensityPercent) {
+    const res = await fetch("/api/lights/set", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ light_id: lightId, intensity: intensityPercent }),
+    });
+    return res.ok ? await res.json() : { success: false };
+  },
+  async off() {
+    const res = await fetch("/api/lights/off", { method: "POST" });
+    return res.ok ? await res.json() : { success: false };
+  },
+  async onAll() {
+    const res = await fetch("/api/lights/on-all", { method: "POST" });
+    return res.ok ? await res.json() : { success: false };
+  },
+};
+
+/* Actuator state: whole box colored by state, one sentence inside */
+function setActuatorBoxState(act, state, movingLabel) {
+  const num = act.replace("ACT", "");
+  const box = document.getElementById("actuator-box-" + act.toLowerCase());
+  if (!box) return;
+  box.className = "actuator-state-box state-" + state;
+  const labels = {
+    retracted: "Actuator " + num + " State: Retracted",
+    extended: "Actuator " + num + " State: Extended",
+    moving: "Actuator " + num + " State: " + (movingLabel || "Moving…"),
+  };
+  box.textContent = labels[state] || "Actuator " + num + " State: " + state;
+}
+
+function setSafetyBoxState(state, message) {
+  const box = document.getElementById("actuator-safety-box");
+  if (!box) return;
+  box.className = "actuator-state-box state-" + state;
+  box.textContent = message != null ? message : (state === "retracted" ? "Safety: Safe to extend others" : state === "extended" ? "Safety: One actuator extended" : "Safety: Command sent");
+}
+
+function updateActuatorStatus(act, dir) {
+  setActuatorBoxState(act, dir === "extend" ? "extended" : "retracted");
+  setSafetyBoxState(dir === "extend" ? "extended" : "retracted");
+}
+
+async function controlActuator(act, dir) {
+  try {
+    setActuatorBoxState(act, "moving", dir === "extend" ? "Extending…" : "Retracting…");
+    setSafetyBoxState("moving", "Safety: Command sent");
+
+    const res = await fetch("/api/actuators/control", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ actuator_name: act, action: dir, duration: 2.0 }),
+    });
+    if (!res.ok) {
+      setSafetyBoxState("extended", "Safety: Retract other actuators first");
+      return;
+    }
+    updateActuatorStatus(act, dir);
+  } catch (e) {
+    // ignore for now
+  }
+}
+async function retractAllActuators() {
+  try {
+    ["ACT1", "ACT2", "ACT3"].forEach((a) => setActuatorBoxState(a, "retracted"));
+    setSafetyBoxState("retracted", "Safety: Safe to extend others");
+    await fetch("/api/actuators/retract-all", { method: "POST" });
+  } catch (e) {
+    // ignore for now
+  }
+}
+async function clearStage() {
+  try {
+    setSafetyBoxState("moving", "Safety: Clearing stage…");
+    const res = await fetch("/api/actuators/clear-stage", { method: "POST" });
+    const data = res.ok ? await res.json() : { success: false };
+    if (data.success) {
+      ["ACT1", "ACT2", "ACT3"].forEach((a) => setActuatorBoxState(a, "retracted"));
+      setSafetyBoxState("retracted", "Safety: Safe to extend others");
+    } else {
+      setSafetyBoxState(
+        "extended",
+        res.status === 409 ? "Safety: Retract all actuators first" : "Safety: Clear stage failed"
+      );
+    }
+  } catch (e) {
+    setSafetyBoxState("extended", "Safety: Clear stage failed");
+  }
+}
+async function turnOnAllLights() {
+  // Update sliders and labels to reflect full intensity
+  for (let n = 1; n <= 4; n += 1) {
+    const slider = document.getElementById("light" + n + "-slider");
+    if (slider) slider.value = 100;
+    const label = document.getElementById("light" + n + "-value");
+    if (label) label.textContent = "100%";
+  }
+  try {
+    await lightsApi.onAll();
+  } catch (e) {
+    // ignore for now; UI already updated
+  }
+}
+async function turnOffAllLights() {
+  // Update sliders and labels to reflect zero intensity
+  for (let n = 1; n <= 4; n += 1) {
+    const slider = document.getElementById("light" + n + "-slider");
+    if (slider) slider.value = 0;
+    const label = document.getElementById("light" + n + "-value");
+    if (label) label.textContent = "0%";
+  }
+  try {
+    await lightsApi.off();
+  } catch (e) {
+    // ignore for now; UI already updated
+  }
+}
+async function activateKickMotor() {
+  try {
+    await fetch("/api/motors/kick", { method: "POST" });
+  } catch (e) {
+    // ignore
+  }
+}
+async function activateFlipMotor() {
+  try {
+    const input = document.getElementById("flip-duration-input");
+    const duration = input ? Number(input.value) || 0.25 : 0.25;
+    await fetch("/api/motors/flip", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ motor: "m1", action: "extend", duration }),
+    });
+  } catch (e) {
+    // ignore
+  }
+}
+async function applyConfiguration() {
+  try {
+    const exposure = Number(document.getElementById("exposure-slider").value);
+    const red = Number(document.getElementById("red-gain-slider").value);
+    const blue = Number(document.getElementById("blue-gain-slider").value);
+    await fetch("/api/cameras/configure", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        exposure_ms: exposure,
+        red_gain: red,
+        blue_gain: blue,
+        analogue_gain: 4.0,
+      }),
+    });
+  } catch (e) {
+    // ignore for now
+  }
+}
+
+async function captureImage(cameraName) {
+  try {
+    const res = await fetch("/api/cameras/capture", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ camera_name: cameraName }),
+    });
+    const data = res.ok ? await res.json() : { success: false };
+    if (!data.success) return;
+
+    const which = cameraName.toLowerCase().includes("b") ? "B" : "A";
+    const cell = document.querySelector(
+      '.manual-images-panel .image-cell[data-label="CAM ' + which + '"]'
+    );
+    if (cell) {
+      const img = document.createElement("img");
+      img.src = "/static/captures/cam" + which + "_latest.jpg?ts=" + Date.now();
+      img.style.width = "100%";
+      img.style.height = "100%";
+      img.style.objectFit = "contain";
+      cell.innerHTML = "";
+      cell.appendChild(img);
+    }
+  } catch (e) {
+    // ignore for now
+  }
+}
+
+async function captureAllCamerasSequentially() {
+  // Fire both captures in parallel, like the old Pi version did.
+  await Promise.all([captureImage("camera A"), captureImage("camera B")]);
+}
 function updateFlipDurationValue(_v) {}
 
-function updateLightValue(n, v) {
+async function updateLightValue(n, v) {
   const el = document.getElementById("light" + n + "-value");
   if (el) el.textContent = v + "%";
+  const numeric = Number(v);
+  if (Number.isNaN(numeric)) return;
+  try {
+    await lightsApi.set(n, numeric);
+  } catch (e) {
+    // ignore errors for now; UI still reflects requested value
+  }
 }
 function updateExposureValue(v) {
   const el = document.getElementById("exposure-value");
@@ -120,6 +317,40 @@ tabs.forEach((tab) => {
 
 /* Initialize ARIA for initial state */
 setTabAria("run");
+
+// Periodically refresh server logs into the Logs & Health panel
+const logsBox = document.querySelector(".logs-box");
+
+async function refreshLogs() {
+  if (!logsBox) return;
+  try {
+    const data = await logsApi.tail(200);
+    if (!data || !data.success || !Array.isArray(data.lines)) return;
+    logsBox.innerHTML = "";
+    data.lines.forEach((line) => {
+      const row = document.createElement("div");
+      row.classList.add("log-line");
+      let level = "info";
+      if (line.includes(" [ERROR]")) level = "error";
+      else if (line.includes(" [WARNING]") || line.includes(" [WARN]")) level = "warn";
+      row.classList.add("log-level-" + level);
+      row.textContent = line;
+      logsBox.appendChild(row);
+    });
+    logsBox.scrollTop = logsBox.scrollHeight;
+  } catch (err) {
+    // Ignore log polling errors; UI should remain responsive
+  }
+}
+
+if (logsBox) {
+  refreshLogs();
+  setInterval(refreshLogs, 2000);
+}
+
+// Initialize actuator state boxes
+["ACT1", "ACT2", "ACT3"].forEach((a) => setActuatorBoxState(a, "retracted"));
+setSafetyBoxState("retracted");
 
 let currentPage = 1;
 let totalPages = 1;

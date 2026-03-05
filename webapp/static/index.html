@@ -4,14 +4,14 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Vallum NDT ADR</title>
-  <link rel="stylesheet" href="/style.css" />
+  <link rel="stylesheet" href="/static/style.css" />
 </head>
 <body>
   <div class="shell">
     <header class="header">
       <div class="header-left">
         <div class="brand-mark">
-          <img src="/logo.png" alt="Vallum logo" />
+          <img src="/static/logo.png" alt="Vallum logo" />
         </div>
         <div class="title-block">
           <h1>Vallum NDT ADR</h1>
@@ -218,17 +218,10 @@
               <div class="control-panel">
                 <h3>Actuator Control</h3>
                 <div class="status-grid">
-                  <div class="status-item">
-                    <span class="status-label">ACT1:</span>
-                    <span class="status-value" id="manual-act1-status">Loading...</span>
-                  </div>
-                  <div class="status-item">
-                    <span class="status-label">ACT2:</span>
-                    <span class="status-value" id="manual-act2-status">Loading...</span>
-                  </div>
-                  <div class="status-item">
-                    <span class="status-label">ACT3:</span>
-                    <span class="status-value" id="manual-act3-status">Loading...</span>
+                  <div class="actuator-state-boxes">
+                    <div class="actuator-state-box state-retracted" id="actuator-box-act1">Actuator 1 State: Retracted</div>
+                    <div class="actuator-state-box state-retracted" id="actuator-box-act2">Actuator 2 State: Retracted</div>
+                    <div class="actuator-state-box state-retracted" id="actuator-box-act3">Actuator 3 State: Retracted</div>
                   </div>
                   <div class="button-grid button-grid-2x3">
                     <button class="btn btn-warning" onclick="controlActuator('ACT1', 'extend')">ACT1 EXTEND</button>
@@ -239,10 +232,7 @@
                     <button class="btn btn-success" onclick="controlActuator('ACT3', 'retract')">ACT3 RETRACT</button>
                   </div>
                   <div class="compact-row">
-                    <div class="status-item">
-                      <span class="status-label">Safety Status:</span>
-                      <span class="status-value" id="manual-safety-status">Loading...</span>
-                    </div>
+                    <div class="actuator-state-box state-retracted" id="actuator-safety-box">Safety: Safe to extend others</div>
                     <button class="btn btn-warning" onclick="retractAllActuators()">RETRACT ALL</button>
                   </div>
                   <div class="button-grid">
@@ -374,7 +364,7 @@
                   <div class="slider-container">
                     <div class="slider-label">
                       <span>Red Gain:</span>
-                      <span id="red-gain-value">3.0</span>
+                      <span id="red-gain-value">4.0</span>
                     </div>
                     <input
                       type="range"
@@ -383,14 +373,14 @@
                       min="1.0"
                       max="5.0"
                       step="0.1"
-                      value="3.0"
+                      value="4.0"
                       oninput="updateRedGainValue(this.value)"
                     />
                   </div>
                   <div class="slider-container">
                     <div class="slider-label">
                       <span>Blue Gain:</span>
-                      <span id="blue-gain-value">1.0</span>
+                      <span id="blue-gain-value">0.5</span>
                     </div>
                     <input
                       type="range"
@@ -399,7 +389,7 @@
                       min="0.25"
                       max="2.0"
                       step="0.05"
-                      value="1.0"
+                      value="0.5"
                       oninput="updateBlueGainValue(this.value)"
                     />
                   </div>
@@ -540,6 +530,6 @@
     </footer>
   </div>
 
-  <script src="/app.js"></script>
+  <script src="/static/app.js"></script>
 </body>
 </html>

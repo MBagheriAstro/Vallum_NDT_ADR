@@ -354,6 +354,50 @@ body {
   color: var(--text-main);
 }
 
+.status-value.status-ok {
+  color: #16a34a;
+}
+
+.status-value.status-extended {
+  color: #b91c1c;
+}
+
+.status-value.status-moving {
+  color: #92400e;
+}
+
+.actuator-state-boxes {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.actuator-state-box {
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  border: 1px solid transparent;
+}
+
+.actuator-state-box.state-retracted {
+  background: #dcfce7;
+  color: #166534;
+  border-color: #86efac;
+}
+
+.actuator-state-box.state-extended {
+  background: #fee2e2;
+  color: #b91c1c;
+  border-color: #fecaca;
+}
+
+.actuator-state-box.state-moving {
+  background: #fef3c7;
+  color: #92400e;
+  border-color: #fde68a;
+}
+
 .button-grid {
   display: grid;
   gap: 8px;
@@ -533,8 +577,9 @@ body {
 }
 
 .compact-row .status-item,
+.compact-row .actuator-state-box,
 .compact-row .btn {
-  flex: 1 1 0; /* equal width for Safety Status and Retract All */
+  flex: 1 1 0; /* equal width for Safety and Retract All */
 }
 
 @media (max-width: 1100px) {
@@ -617,20 +662,39 @@ body {
 
 .logs-container {
   margin-top: 8px;
-  height: 100%;
+  display: flex;
+  flex: 1 1 auto;
   min-height: 0;
 }
 
 .logs-box {
   border-radius: 10px;
   border: 1px solid rgba(203, 213, 225, 0.9);
-  background: #f8fafc;
+  background: #e5e7eb;
   padding: 8px;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   font-size: 11px;
   color: #0f172a;
-  overflow: auto;
+  overflow-y: auto;
   min-height: 0;
+  width: 100%;
+  flex: 1 1 auto;
+}
+
+.log-line {
+  white-space: pre-wrap;
+}
+
+.log-level-info {
+  color: #0f172a;
+}
+
+.log-level-warn {
+  color: #92400e;
+}
+
+.log-level-error {
+  color: #b91c1c;
 }
 
 .health-grid {
