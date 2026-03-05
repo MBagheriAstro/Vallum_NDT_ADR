@@ -93,7 +93,7 @@
                   <input class="metadata-input" id="customer-name" type="text" placeholder="Enter customer" />
                 </div>
               </div>
-              <button class="run-btn run-btn-primary metadata-save" type="button">
+              <button class="run-btn run-btn-primary metadata-save" type="button" onclick="saveMetadata()">
                 Save Metadata
               </button>
             </article>
@@ -101,39 +101,39 @@
             <article class="panel" style="grid-area: controls;">
               <div class="panel-label">Run Controls</div>
               <div class="run-controls-grid">
-                <button class="run-btn run-btn-primary" type="button">
+                <button class="run-btn run-btn-primary" type="button" onclick="startInspection()">
                   Start Run
                 </button>
-                <button class="run-btn run-btn-secondary" type="button">
+                <button class="run-btn run-btn-secondary" type="button" onclick="singleInspection()">
                   Single Inspection
                 </button>
-                <button class="run-btn run-btn-outline" type="button">
+                <button class="run-btn run-btn-outline" type="button" onclick="stopInspection()">
                   Stop Run
                 </button>
-                <button class="run-btn run-btn-danger" type="button">
+                <button class="run-btn run-btn-danger" type="button" onclick="stopInspectionImmediate()">
                   Force Stop
                 </button>
               </div>
               <div class="run-metrics">
                 <div class="run-metric">
                   <span class="run-metric-label">Cycles</span>
-                  <span class="run-metric-value">0</span>
+                  <span class="run-metric-value" id="run-cycles">0</span>
                 </div>
                 <div class="run-metric run-metric-balls">
                   <div class="balls-grid">
                     <div class="balls-cell balls-label">Balls</div>
-                    <div class="balls-cell">0 total</div>
-                    <div class="balls-cell">0 good</div>
-                    <div class="balls-cell">0 bad</div>
+                    <div class="balls-cell" id="run-balls-total">0 total</div>
+                    <div class="balls-cell" id="run-balls-good">0 good</div>
+                    <div class="balls-cell" id="run-balls-bad">0 bad</div>
                   </div>
                 </div>
                 <div class="run-metric">
                   <span class="run-metric-label">State</span>
-                  <span class="run-metric-value">Idle</span>
+                  <span class="run-metric-value" id="run-state">Idle</span>
                 </div>
                 <div class="run-metric">
                   <span class="run-metric-label">Last Result</span>
-                  <span class="run-metric-value">–</span>
+                  <span class="run-metric-value" id="run-last-result">–</span>
                 </div>
               </div>
             </article>
@@ -190,21 +190,25 @@
                   <div class="image-cell-placeholder">
                     1024×1024 processed image from Camera A (TOP) will appear here after inference.
                   </div>
+                  <img id="processed-cam-a-top" class="processed-image" style="display:none;" alt="Camera A Top processed" />
                 </div>
                 <div class="image-cell" data-label="CAM B · TOP">
                   <div class="image-cell-placeholder">
                     1024×1024 processed image from Camera B (TOP) will appear here after inference.
                   </div>
+                  <img id="processed-cam-b-top" class="processed-image" style="display:none;" alt="Camera B Top processed" />
                 </div>
                 <div class="image-cell" data-label="CAM A · BOT">
                   <div class="image-cell-placeholder">
                     1024×1024 processed image from Camera A (BOTTOM) will appear here after inference.
                   </div>
+                  <img id="processed-cam-a-bot" class="processed-image" style="display:none;" alt="Camera A Bottom processed" />
                 </div>
                 <div class="image-cell" data-label="CAM B · BOT">
                   <div class="image-cell-placeholder">
                     1024×1024 processed image from Camera B (BOTTOM) will appear here after inference.
                   </div>
+                  <img id="processed-cam-b-bot" class="processed-image" style="display:none;" alt="Camera B Bottom processed" />
                 </div>
               </div>
             </article>

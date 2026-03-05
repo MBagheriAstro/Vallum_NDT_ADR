@@ -45,6 +45,38 @@ const logsApi = {
   },
 };
 
+/* Inspection run API (Start / Stop / Single) */
+const inspectionApi = {
+  async status() {
+    const res = await fetch("/api/inspection/status");
+    return res.ok ? await res.json() : { success: false };
+  },
+  async start(flipDurationSec) {
+    const res = await fetch("/api/inspection/start", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ flip_duration: flipDurationSec }),
+    });
+    return res.ok ? await res.json() : { success: false };
+  },
+  async stop() {
+    const res = await fetch("/api/inspection/stop", { method: "POST" });
+    return res.ok ? await res.json() : { success: false };
+  },
+  async stopImmediate() {
+    const res = await fetch("/api/inspection/stop-immediate", { method: "POST" });
+    return res.ok ? await res.json() : { success: false };
+  },
+  async single(flipDurationSec) {
+    const res = await fetch("/api/inspection/single-inspection", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ flip_duration: flipDurationSec }),
+    });
+    return res.ok ? await res.json() : { success: false };
+  },
+};
+
 /* Lights API client (Jetson control_lights backend) */
 const lightsApi = {
   async set(lightId, intensityPercent) {
@@ -137,6 +169,152 @@ async function clearStage() {
     setSafetyBoxState("extended", "Safety: Clear stage failed");
   }
 }
+
+function getFlipDurationSec() {
+  const input = document.getElementById("flip-duration-input");
+  const ms = input ? Number(input.value) || 250 : 250;
+  return ms / 1000;
+}
+
+async function startInspection() {
+  try {
+    const result = await inspectionApi.start(getFlipDurationSec());
+    if (result.success) {
+      document.getElementById("run-state").textContent = "Running";
+    }
+  } catch (e) {
+    // ignore
+  }
+}
+
+async function stopInspection() {
+  try {
+    const result = await inspectionApi.stop();
+    if (result.success) document.getElementById("run-state").textContent = "Stopping…";
+  } catch (e) {
+    // ignore
+  }
+}
+
+async function stopInspectionImmediate() {
+  try {
+    const result = await inspectionApi.stopImmediate();
+    if (result.success) document.getElementById("run-state").textContent = "Idle";
+  } catch (e) {
+    // ignore
+  }
+}
+
+async function singleInspection() {
+  try {
+    await inspectionApi.single(getFlipDurationSec());
+    updateInspectionStatus();
+  } catch (e) {
+    // ignore
+  }
+}
+
+function saveMetadata() {
+  const metadata = {
+    lotNumber: (document.getElementById("lot-number") && document.getElementById("lot-number").value.trim()) || "",
+    mfgName: (document.getElementById("mfg-name") && document.getElementById("mfg-name").value.trim()) || "",
+    mfgPart: (document.getElementById("mfg-part") && document.getElementById("mfg-part").value.trim()) || "",
+    material: (document.getElementById("material") && document.getElementById("material").value.trim()) || "",
+    ballDiameter: (document.getElementById("ball-diameter") && document.getElementById("ball-diameter").value) || "",
+    customerName: (document.getElementById("customer-name") && document.getElementById("customer-name").value.trim()) || "",
+  };
+  try {
+    sessionStorage.setItem("inspectionMetadata", JSON.stringify(metadata));
+  } catch (err) {
+    // ignore
+  }
+  window.currentMetadata = metadata;
+
+  // Also send metadata to backend so inspection cycles can be saved with context
+  try {
+    fetch("/api/inspection/metadata", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(metadata),
+    });
+  } catch (e) {
+    console.warn("Failed to send inspection metadata to backend", e);
+  }
+}
+
+function loadMetadata() {
+  try {
+    const saved = sessionStorage.getItem("inspectionMetadata");
+    if (saved) {
+      const metadata = JSON.parse(saved);
+      const lot = document.getElementById("lot-number");
+      const mfg = document.getElementById("mfg-name");
+      const part = document.getElementById("mfg-part");
+      const mat = document.getElementById("material");
+      const ball = document.getElementById("ball-diameter");
+      const cust = document.getElementById("customer-name");
+      if (lot) lot.value = metadata.lotNumber || "";
+      if (mfg) mfg.value = metadata.mfgName || "";
+      if (part) part.value = metadata.mfgPart || "";
+      if (mat) mat.value = metadata.material || "";
+      if (ball) ball.value = metadata.ballDiameter || "";
+      if (cust) cust.value = metadata.customerName || "";
+      window.currentMetadata = metadata;
+    }
+  } catch (err) {
+    // ignore
+  }
+}
+
+async function updateInspectionStatus() {
+  try {
+    const data = await inspectionApi.status();
+    if (!data || !data.success) return;
+    const cycles = document.getElementById("run-cycles");
+    const total = document.getElementById("run-balls-total");
+    const good = document.getElementById("run-balls-good");
+    const bad = document.getElementById("run-balls-bad");
+    const state = document.getElementById("run-state");
+    const last = document.getElementById("run-last-result");
+    if (cycles) cycles.textContent = String(data.cycle_count ?? 0);
+    if (total) total.textContent = (data.total_balls ?? 0) + " total";
+    if (good) good.textContent = (data.good_balls ?? 0) + " good";
+    if (bad) bad.textContent = (data.bad_balls ?? 0) + " bad";
+    if (state) {
+      if (data.running) state.textContent = "Running";
+      else if (data.state === "stopping") state.textContent = "Stopping…";
+      else state.textContent = "Idle";
+    }
+    if (last) last.textContent = data.last_result || "–";
+
+    // Update processed images (4 views) if available
+    const processed = data.processed_images || {};
+    const viewMap = [
+      { id: "processed-cam-a-top", key: "CAMERA_A_TOP" },
+      { id: "processed-cam-b-top", key: "CAMERA_B_TOP" },
+      { id: "processed-cam-a-bot", key: "CAMERA_A_BOT" },
+      { id: "processed-cam-b-bot", key: "CAMERA_B_BOT" },
+    ];
+    viewMap.forEach(({ id, key }) => {
+      const img = document.getElementById(id);
+      if (!img) return;
+      const cell = img.closest(".image-cell");
+      const placeholder = cell && cell.querySelector(".image-cell-placeholder");
+      const url = processed[key];
+      if (url) {
+        img.src = url + "?t=" + Date.now(); // cache-bust to show latest
+        img.style.display = "block";
+        if (placeholder) placeholder.style.display = "none";
+      } else {
+        img.style.display = "none";
+        if (placeholder) placeholder.style.display = "flex";
+      }
+    });
+  } catch (e) {
+    // ignore
+  }
+}
+
 async function turnOnAllLights() {
   // Update sliders and labels to reflect full intensity
   for (let n = 1; n <= 4; n += 1) {
@@ -347,6 +525,10 @@ if (logsBox) {
   refreshLogs();
   setInterval(refreshLogs, 2000);
 }
+
+loadMetadata();
+updateInspectionStatus();
+setInterval(updateInspectionStatus, 2000);
 
 // Initialize actuator state boxes
 ["ACT1", "ACT2", "ACT3"].forEach((a) => setActuatorBoxState(a, "retracted"));
