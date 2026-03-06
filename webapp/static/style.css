@@ -74,11 +74,12 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
+  gap: 8px;
   margin-right: 10px;
 }
 
 .brand-mark img {
-  height: 32px;
+  height: 48px;
   width: auto;
   display: block;
 }
@@ -314,7 +315,8 @@ body {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  min-height: 160px;
+  min-height: 0; /* allow shrink in flex layout so panel stays in its box */
+  overflow: hidden; /* keep content inside; children scale down to fit */
 }
 
 .control-panel h3 {
@@ -370,6 +372,42 @@ body {
   display: flex;
   flex-direction: column;
   gap: 6px;
+}
+
+/* Actuator Control panel: scale down content to fit (no scroll) */
+.manual-left .control-panel:first-child .status-grid > * {
+  flex: 1 1 0;
+  min-height: 0;
+}
+
+.manual-left .control-panel:first-child .actuator-state-boxes {
+  min-height: 0;
+}
+
+.manual-left .control-panel:first-child .actuator-state-box {
+  flex: 1 1 0;
+  min-height: 0;
+  padding: 6px 12px;
+}
+
+.manual-left .control-panel:first-child .button-grid-2x3 {
+  grid-auto-rows: minmax(0, 1fr);
+  min-height: 0;
+}
+
+.manual-left .control-panel:first-child .button-grid .btn {
+  min-height: 0;
+  padding-block: 6px;
+}
+
+.manual-left .control-panel:first-child .compact-row .actuator-state-box,
+.manual-left .control-panel:first-child .compact-row .btn {
+  min-height: 0;
+}
+
+.manual-left .control-panel:first-child .button-grid:not(.button-grid-2x3) {
+  grid-auto-rows: minmax(0, 1fr);
+  min-height: 0;
 }
 
 .actuator-state-box {
@@ -986,8 +1024,24 @@ body {
   border-top: 1px solid var(--border-subtle);
   display: flex;
   justify-content: space-between;
+  align-items: center;
   gap: 10px;
   background: linear-gradient(to right, #e0f2fe, #eef2ff);
+}
+
+.footer-left {
+  flex-shrink: 0;
+}
+
+.footer-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.footer-right #footer-uptime {
+  color: var(--text-muted);
 }
 
 /* History tab */

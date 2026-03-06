@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Vallum NDT ADR</title>
+  <title>Vallum/Evolve NDT ADR</title>
   <link rel="stylesheet" href="/static/style.css" />
 </head>
 <body>
@@ -11,18 +11,15 @@
     <header class="header">
       <div class="header-left">
         <div class="brand-mark">
-          <img src="/static/logo.png" alt="Vallum logo" />
+          <img src="/static/vallum_logo.png" alt="Vallum" />
+          <img src="/static/evolve_logo.png" alt="Evolve" />
         </div>
         <div class="title-block">
-          <h1>Vallum NDT ADR</h1>
+          <h1>Vallum/Evolve NDT ADR</h1>
           <p>AI‑powered Industrial Inspection Control</p>
         </div>
       </div>
       <div class="header-right">
-        <div class="pill">
-          <span class="pill-dot"></span>
-          <span>Jetson Orin Nano · Online</span>
-        </div>
         <div class="tab-list" style="flex-direction:row;gap:8px;" role="tablist" aria-label="Main navigation">
           <button class="tab active" id="tab-run" role="tab" aria-selected="true" aria-controls="panel-run" data-tab="run">
             <div class="tab-title-row">
@@ -76,7 +73,7 @@
                 </div>
                 <div class="metadata-item">
                   <label class="metadata-label" for="ball-diameter">Ball Diameter</label>
-                  <select class="metadata-select" id="ball-diameter">
+                  <select class="metadata-select" id="ball-diameter" onchange="setFlipDurationFromBallDiameter()">
                     <option value="1/2">1/2 in (12.7000 mm)</option>
                     <option value="17/32">17/32 in (13.4938 mm)</option>
                     <option value="9/16">9/16 in (14.2875 mm)</option>
@@ -113,6 +110,18 @@
                 <button class="run-btn run-btn-danger" type="button" onclick="stopInspectionImmediate()">
                   Force Stop
                 </button>
+                <button class="run-btn run-btn-outline" type="button" onclick="restartServer()">
+                  Restart App
+                </button>
+                <button
+                  class="run-btn run-btn-danger"
+                  type="button"
+                  onmousedown="powerButtonDown()"
+                  onmouseup="powerButtonUp()"
+                  onmouseleave="powerButtonUp()"
+                >
+                  Shutdown / Reboot
+                </button>
               </div>
               <div class="run-metrics">
                 <div class="run-metric">
@@ -142,36 +151,36 @@
               <div class="panel-label">Key Stats</div>
               <div class="stats-grid">
                 <div class="stat-pill">
-                  <span class="stat-label">Frontend</span>
-                  <span class="stat-value">OK</span>
+                  <span class="stat-label">Server</span>
+                  <span class="stat-value" id="stat-server">OK</span>
                 </div>
                 <div class="stat-pill">
-                  <span class="stat-label">Backend</span>
-                  <span class="stat-value">Unknown</span>
+                  <span class="stat-label">Ball on Stage?</span>
+                  <span class="stat-value" id="stat-ball">NO</span>
                 </div>
                 <div class="stat-pill stat-ok">
-                  <span class="stat-label">Sensors</span>
-                  <span class="stat-value">OK</span>
+                  <span class="stat-label">Kick Sensor</span>
+                  <span class="stat-value" id="stat-blade">Not Ready</span>
                 </div>
                 <div class="stat-pill stat-ok">
                   <span class="stat-label">Actuators</span>
-                  <span class="stat-value">Safe</span>
+                  <span class="stat-value" id="stat-actuators">Safe</span>
                 </div>
                 <div class="stat-pill stat-hw">
                   <span class="stat-label">CPU</span>
-                  <span class="stat-value">— %</span>
+                  <span class="stat-value" id="stat-cpu">— %</span>
                 </div>
                 <div class="stat-pill stat-hw">
                   <span class="stat-label">GPU</span>
-                  <span class="stat-value">— %</span>
+                  <span class="stat-value" id="stat-gpu">— %</span>
                 </div>
                 <div class="stat-pill stat-hw">
                   <span class="stat-label">RAM</span>
-                  <span class="stat-value">— %</span>
+                  <span class="stat-value" id="stat-ram">— %</span>
                 </div>
                 <div class="stat-pill stat-hw">
                   <span class="stat-label">Disk</span>
-                  <span class="stat-value">— %</span>
+                  <span class="stat-value" id="stat-disk">— %</span>
                 </div>
               </div>
             </article>
@@ -529,8 +538,11 @@
     </main>
 
     <footer class="footer">
-      <span>Step 1: Web shell ready on Jetson.</span>
-      <span>Next: wire tabs to FastAPI endpoints and existing motor/light scripts.</span>
+      <span class="footer-left">© 2025 Vallum Software. All rights reserved.</span>
+      <span class="footer-right">
+        <span id="footer-datetime"></span>
+        <span id="footer-uptime"></span>
+      </span>
     </footer>
   </div>
 

@@ -1,47 +1,39 @@
 # Vallum-Jetson
 
-Simple motor control and experiments for **Jetson (Orin Nano / Nano)** using the same **Adafruit DC/Stepper Motor HAT** (PCA9685) as the Pi frontend. Everything here runs on the Jetson, not the Pi.
+**Vallum/Evolve NDT ADR** dashboard and inspection control for **Jetson (Orin Nano / Nano)**. Single webapp: lights, motors (Motor HAT + flip GPIO), cameras, inspection run, and history. Everything runs on the Jetson.
 
-## Compatibility
+## Documentation
 
-- **Adafruit DC and Stepper Motor HAT** uses I2C (PCA9685 at 0x60). It is designed for Raspberry Pi but works on Jetson with **Adafruit Blinka**, which provides a CircuitPython-compatible layer on Linux (Jetson Nano and Jetson Orin Nano are supported).
-- **Pin mapping:** The HAT stacks on the 40-pin header. Jetson 40-pin layout matches Pi in many cases for I2C (SDA/SCL); confirm I2C is enabled and the HAT is detected at 0x60.
+| Document | Description |
+|----------|-------------|
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Code layout, how the webapp drives hardware, inspection flow. |
 
 ## Setup
 
-1. **Enable I2C** on the Jetson (e.g. Jetson-IO or `sudo apt install -y i2c-tools` and enable in device tree / config).
-2. **Check HAT address:**
-   ```bash
-   sudo i2cdetect -y 1
-   ```
-   You should see `60` (or the HAT’s address if you changed the jumpers).
-3. **Create venv and install dependencies:**  
-   (Jetson.GPIO is in requirements for Blinka board detection.)
+1. **Enable I2C** on the Jetson (e.g. Jetson-IO or `sudo apt install -y i2c-tools`).
+2. **Check HAT address:** `sudo i2cdetect -y 1` — expect `60` (PCA9685).
+3. **Install dependencies** (optional venv):
    ```bash
    cd Vallum-Jetson
-   python3 -m venv venv
+   python3 -m venv venv   # optional
    source venv/bin/activate
    pip install -r requirements.txt
    ```
+4. **libgpiod-utils** (for lights/sensors): `sudo apt install libgpiod-utils` (and `python3-libgpiod` for flip motor).
+5. **Inspection inference (GPU on Jetson):** The YOLO model is at `webapp/models/best.pt`. For **Jetson GPU inference**, run **`./scripts/setup_jetson_inference.sh`** from the repo root first; it installs PyTorch 2.3 and torchvision 0.18 from NVIDIA wheels (matching the old backend) plus ultralytics, opencv-python, Pillow, numpy. See [docs/JETSON_INFERENCE_SETUP.md](docs/JETSON_INFERENCE_SETUP.md). On non-Jetson, `pip install -r requirements.txt` is enough (CPU inference).
 
-## Usage
+## Webapp (main application)
 
-- **One-shot:** Control motor by name and action (extend/retract/stop), optional duration in seconds:
-  ```bash
-  source venv/bin/activate
-  python control_motors.py m2 extend 1.5
-  python control_motors.py m2 retract
-  python control_motors.py m2 stop
-  python control_motors.py m1 extend 2
-  ```
-- **Interactive REPL:** Prompt for repeated commands (m1–m4, extend/retract/stop, stopall, status, quit):
-  ```bash
-  python control_motors.py --interactive
-  ```
-- **Status:** Confirm MotorKit is initialized:
-  ```bash
-  python control_motors.py --status
-  ```
+Run the dashboard and API:
+
+```bash
+cd webapp && python3 main.py
+```
+
+- **URL:** http://localhost:8080 (or http://\<jetson-ip\>:8080).
+- **API docs:** http://localhost:8080/docs
+
+The webapp controls lights (gpioset), actuators and kick motor (MotorKit), flip motor (gpiod), ball/blade sensors (gpioget), and cameras (OpenCV/GStreamer) directly. Hardware testing (lights, motors, actuators) is done via the **Manual Control** tab in the dashboard.
 
 ## Motor mapping (same as Pi frontend)
 
@@ -52,26 +44,11 @@ Simple motor control and experiments for **Jetson (Orin Nano / Nano)** using the
 | **M3**  | ACT2             | -1 = extend, 1 = retract |
 | **M4**  | ACT3             | -1 = extend, 1 = retract  |
 
-On the Pi, the **flip** motor is not on the HAT (it uses GPIO PWM pins 13/12). This script only controls M1–M4 on the HAT.
+On the Pi, the **flip** motor is not on the HAT (it uses GPIO PWM pins 13/12). The webapp controls M1–M4 on the HAT plus the flip motor via GPIO.
 
-## Lights (`control_lights.py`)
+## Lights (webapp / Manual Control)
 
-Same as Pi 5: **BCM 22, 23, 24, 25** = **physical pins 15, 16, 18, 22** on the 40-pin header. The script uses **BOARD (physical pin) mode** by default so the same cable/HAT works on Jetson without rewiring.
-
-- **Blink test** (finds which pin drives which light):
-  ```bash
-  python control_lights.py blink
-  python control_lights.py blink --blink-cycles 5
-  ```
-- **Simple on/off** (no PWM): `simple_on`, then `simple_off` or `off`.
-- **PWM on** (process stays running; Ctrl+C to turn off): `python control_lights.py on`
-- If your wiring uses BCM numbering on the Jetson header: `python control_lights.py simple_on --bcm`
-- If lights are **active-low** (ON when pin is LOW): `python control_lights.py simple_on --active-low`
-- **Nothing works?** Run the **probe** to try each pin in both polarities (watch which phase turns a light on):
-  ```bash
-  python control_lights.py probe
-  ```
-  If a light turns on in Phase 2, use `simple_on --active-low`. If still no light, try `sudo python control_lights.py probe` (GPIO may need root) or confirm the lights are connected to the same 40-pin header as on the Pi.
+Same as Pi 5: **BCM 22, 23, 24, 25** = **physical pins 15, 16, 18, 22** on the 40-pin header. The webapp uses **gpioset** (libgpiod) with gpiochip0 offsets 85, 126, 125, 123. Use the dashboard **Manual Control** tab to turn lights on/off. If lights do not respond, confirm wiring and that `libgpiod-utils` is installed (`sudo apt install libgpiod-utils`).
 
 ### JetPack 6: GPIO requires BCT pinmux change and reflash
 
@@ -84,7 +61,7 @@ On **JetPack 6.0**, the kernel uses the **upstream GPIO driver**, which does **n
 
 Documentation: [NVIDIA Jetson Module Adaptation and Bring-Up – Pinmux changes](https://docs.nvidia.com/jetson/archives/r36.3/DeveloperGuide/HR/JetsonModuleAdaptationAndBringUp/JetsonAgxOrinSeries.html?highlight=pin%20direction#pinmux-changes) (process is similar for Orin Nano; use your module’s pinmux spreadsheet and BCT layout).
 
-After reflashing with the corrected pinmux, the same `control_lights.py` / `test_lights_sysfs.py` and voltage tests should work.
+After reflashing with the corrected pinmux, test lights from the webapp **Manual Control** tab (or voltage tests).
 
 ### Jetson Nano J12 pinout (from expansion header tables)
 
@@ -137,7 +114,7 @@ Use **Jetson-IO** so the 40-pin header SPI pins become GPIO. Run on the Jetson (
 6. After reboot, check that SPI is off and lights work:
    ```bash
    ls /dev/spi*          # should get "No such file or directory"
-   python control_lights.py simple_on
+   # Then use the webapp Manual Control tab to test lights
    ```
 
 **If Jetson-IO shows the pins as "unused" and nothing to disable:** SPI is enabled in the **base device tree**, not by the header tool. Use the provided overlay to disable the expansion-header SPI controllers:
@@ -156,7 +133,7 @@ Use **Jetson-IO** so the 40-pin header SPI pins become GPIO. Run on the Jetson (
    OVERLAYS /boot/tegra234-disable-spi-expansion.dtbo
    ```
 
-3. **Reboot.** After reboot, run `ls /dev/spi*` — you should get "No such file or directory". Then test lights with `python control_lights.py simple_on`.
+3. **Reboot.** After reboot, run `ls /dev/spi*` — you should get "No such file or directory". Then test lights from the webapp Manual Control tab.
 
 To **re-enable SPI** later, remove the overlay from the `OVERLAYS` line and reboot.
 

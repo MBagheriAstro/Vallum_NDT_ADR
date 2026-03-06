@@ -17,3 +17,12 @@ venv/
 
 # Generated captures (manual tab)
 webapp/static/captures/
+
+# SQLite DB (created at runtime)
+webapp/inspection_history.db
+
+# Camera config override (set by scripts/set_camera_config.py)
+webapp/camera_config.json
+
+# Jetson PyTorch/torchvision wheels (downloaded by scripts/setup_jetson_inference.sh)
+.jetson_wheels/

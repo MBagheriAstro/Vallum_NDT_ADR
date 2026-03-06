@@ -45,6 +45,27 @@ const logsApi = {
   },
 };
 
+/* System stats API client */
+let serverStartedAt = null; // set from first status() for footer uptime
+const systemApi = {
+  async status() {
+    const res = await fetch("/api/system/status");
+    return res.ok ? await res.json() : { success: false };
+  },
+  async restart() {
+    const res = await fetch("/api/system/restart-app", { method: "POST" });
+    return res.ok ? await res.json() : { success: false };
+  },
+  async power(action) {
+    const res = await fetch("/api/system/power", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action }),
+    });
+    return res.ok ? await res.json() : { success: false };
+  },
+};
+
 /* Inspection run API (Start / Stop / Single) */
 const inspectionApi = {
   async status() {
@@ -77,7 +98,7 @@ const inspectionApi = {
   },
 };
 
-/* Lights API client (Jetson control_lights backend) */
+/* Lights API client (webapp drives GPIO via gpioset) */
 const lightsApi = {
   async set(lightId, intensityPercent) {
     const res = await fetch("/api/lights/set", {
@@ -170,6 +191,44 @@ async function clearStage() {
   }
 }
 
+/**
+ * Flip duration from ball size (from VALLUM-NDT-ADR-FRONTEND).
+ * No-slip rolling on wheel: R = 30 mm, one full rotation = 1850 ms (measured).
+ * For 180° ball flip: θ_wheel = π·d_ball/(2·R), T_flip = θ_wheel * T_full/(2π).
+ */
+const WHEEL_RADIUS_MM = 30;
+const WHEEL_FULL_ROTATION_MS = 1850;
+
+/* Ball diameter option value -> inches (same fractions as metadata select) */
+const BALL_DIAMETER_INCHES = {
+  "1/2": 32 / 64,
+  "17/32": 34 / 64,
+  "9/16": 36 / 64,
+  "19/32": 38 / 64,
+  "5/8": 40 / 64,
+  "21/32": 42 / 64,
+  "11/16": 44 / 64,
+  "23/32": 46 / 64,
+  "3/4": 48 / 64,
+};
+
+function flipDurationMsFromBallDiameter(ballValue) {
+  const inches = BALL_DIAMETER_INCHES[ballValue];
+  if (inches == null) return 250;
+  const d_ball_mm = inches * 25.4;
+  const theta_wheel_rad = Math.PI * d_ball_mm / (2 * WHEEL_RADIUS_MM);
+  const ms = theta_wheel_rad * (WHEEL_FULL_ROTATION_MS / (2 * Math.PI));
+  return Math.max(50, Math.min(3000, Math.round(ms)));
+}
+
+function setFlipDurationFromBallDiameter() {
+  const sel = document.getElementById("ball-diameter");
+  const input = document.getElementById("flip-duration-input");
+  if (!sel || !input) return;
+  const ms = flipDurationMsFromBallDiameter(sel.value);
+  input.value = String(ms);
+}
+
 function getFlipDurationSec() {
   const input = document.getElementById("flip-duration-input");
   const ms = input ? Number(input.value) || 250 : 250;
@@ -260,6 +319,7 @@ function loadMetadata() {
       if (ball) ball.value = metadata.ballDiameter || "";
       if (cust) cust.value = metadata.customerName || "";
       window.currentMetadata = metadata;
+      setFlipDurationFromBallDiameter();
     }
   } catch (err) {
     // ignore
@@ -315,6 +375,58 @@ async function updateInspectionStatus() {
   }
 }
 
+async function updateSystemStats() {
+  try {
+    const res = await systemApi.status();
+    if (!res || !res.success) return;
+    if (res.server_started_at && serverStartedAt == null) serverStartedAt = res.server_started_at;
+    const cpu = res.cpu_percent;
+    const ram = res.ram_percent;
+    const disk = res.disk_percent;
+    const gpu = res.gpu_percent;
+    const serverEl = document.getElementById("stat-server");
+    const ballEl = document.getElementById("stat-ball");
+    const bladeEl = document.getElementById("stat-blade");
+    const cpuEl = document.getElementById("stat-cpu");
+    const ramEl = document.getElementById("stat-ram");
+    const diskEl = document.getElementById("stat-disk");
+    const gpuEl = document.getElementById("stat-gpu");
+    if (serverEl) serverEl.textContent = res.success ? "OK" : "Error";
+    if (ballEl) ballEl.textContent = res.ball_on_stage ? "YES" : "NO";
+    if (bladeEl) bladeEl.textContent = res.blade_horizontal ? "Ready" : "Not Ready";
+    if (cpuEl && cpu != null) cpuEl.textContent = cpu.toFixed(0) + " %";
+    if (ramEl && ram != null) ramEl.textContent = ram.toFixed(0) + " %";
+    if (diskEl && disk != null) diskEl.textContent = disk.toFixed(0) + " %";
+    if (gpuEl) gpuEl.textContent = gpu != null ? gpu.toFixed(0) + " %" : "N/A";
+  } catch (e) {
+    // ignore
+  }
+}
+
+function formatUptime(seconds) {
+  if (seconds < 60) return seconds + "s";
+  const m = Math.floor(seconds / 60) % 60;
+  const h = Math.floor(seconds / 3600) % 24;
+  const d = Math.floor(seconds / 86400);
+  const parts = [];
+  if (d) parts.push(d + "d");
+  if (h) parts.push(h + "h");
+  if (m || parts.length) parts.push(m + "m");
+  return parts.length ? parts.join(" ") : seconds + "s";
+}
+
+function updateFooterClock() {
+  const dtEl = document.getElementById("footer-datetime");
+  const upEl = document.getElementById("footer-uptime");
+  const now = new Date();
+  if (dtEl) dtEl.textContent = now.toLocaleString(undefined, { dateStyle: "short", timeStyle: "medium" });
+  if (upEl && serverStartedAt) {
+    const start = new Date(serverStartedAt).getTime();
+    const sec = Math.max(0, Math.floor((now.getTime() - start) / 1000));
+    upEl.textContent = "Server up: " + formatUptime(sec);
+  }
+}
+
 async function turnOnAllLights() {
   // Update sliders and labels to reflect full intensity
   for (let n = 1; n <= 4; n += 1) {
@@ -350,10 +462,51 @@ async function activateKickMotor() {
     // ignore
   }
 }
+
+async function restartServer() {
+  try {
+    await systemApi.restart();
+  } catch (e) {
+    // ignore
+  }
+}
+
+let powerPressTimer = null;
+let powerLongPress = false;
+let powerButtonWasPressed = false; // only act on mouseup/leave if mousedown happened
+
+function powerButtonDown() {
+  powerButtonWasPressed = true;
+  powerLongPress = false;
+  if (powerPressTimer) clearTimeout(powerPressTimer);
+  powerPressTimer = setTimeout(() => {
+    powerLongPress = true;
+  }, 2000);
+}
+
+async function powerButtonUp() {
+  if (powerPressTimer) {
+    clearTimeout(powerPressTimer);
+    powerPressTimer = null;
+  }
+  if (!powerButtonWasPressed) return; // hover/leave without click: do nothing
+  powerButtonWasPressed = false;
+  try {
+    if (powerLongPress) {
+      await systemApi.power("reboot");
+    } else {
+      await systemApi.power("shutdown");
+    }
+  } catch (e) {
+    // ignore
+  } finally {
+    powerLongPress = false;
+  }
+}
 async function activateFlipMotor() {
   try {
     const input = document.getElementById("flip-duration-input");
-    const duration = input ? Number(input.value) || 0.25 : 0.25;
+    const duration = input ? Number(input.value) || 250 : 250; /* ms */
     await fetch("/api/motors/flip", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -527,8 +680,15 @@ if (logsBox) {
 }
 
 loadMetadata();
+setFlipDurationFromBallDiameter();
 updateInspectionStatus();
 setInterval(updateInspectionStatus, 2000);
+
+updateSystemStats();
+setInterval(updateSystemStats, 5000);
+
+updateFooterClock();
+setInterval(updateFooterClock, 1000);
 
 // Initialize actuator state boxes
 ["ACT1", "ACT2", "ACT3"].forEach((a) => setActuatorBoxState(a, "retracted"));

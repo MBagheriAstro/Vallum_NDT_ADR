@@ -1,6 +1,8 @@
 # Inspection Run: Merge Plan (Single Platform on Jetson)
 
-**Goal:** Run the same inspection flow that used to run on **Pi 5 (frontend + hardware)** and **remote inference server**, entirely on **one Jetson Orin Nano**. No network hop: hardware control, dashboard, and inference all on this device. Order of operations matches the old code (master-HQ / main-hq); we merge by doing **local pipeline inference** (no zip, TOP→extract+infer, BOT→extract+infer, then combine and actuate).
+**Design reference.** This document described the plan to run the Pi 5 + remote inference flow entirely on one Jetson. The **implementation** is in the webapp: `webapp/services/inspection.py` (cycle flow), `webapp/services/inference.py` (worker), `webapp/hardware/` (sensors, camera, motors, flip), `webapp/core/database.py` and `webapp/api/history.py` (persistence). See [ARCHITECTURE.md](ARCHITECTURE.md) and [REMAINING_WORK.md](REMAINING_WORK.md) for current layout and status.
+
+**Goal (historical):** Run the same inspection flow that used to run on **Pi 5 (frontend + hardware)** and **remote inference server**, entirely on **one Jetson Orin Nano**. No network hop; local pipeline inference (no zip, TOP→extract+infer, BOT→extract+infer, then combine and actuate).
 
 ---
 

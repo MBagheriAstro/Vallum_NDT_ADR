@@ -21,41 +21,57 @@ _YOLO_IMGSZ = 1024
 _YOLO_CONF = 0.4  # detection threshold (same ballpark as backend)
 _EXPECTED_BALL_DIAMETER_PX = 1278  # default from HQ settings (11/16\" estimate)
 
+# Default model: copy in this repo (webapp/models/best.pt); fallbacks for older layouts
+_WEBAPP_DIR = Path(__file__).resolve().parent
+_REPO_ROOT = _WEBAPP_DIR.parent
+_DEFAULT_MODEL_PATHS = [
+    _WEBAPP_DIR / "models" / "best.pt",
+    _REPO_ROOT / "VALLUM-NDT-ADR-BACKEND" / "runs" / "detect" / "yolo_defect_detection" / "defect_model_yolo11" / "weights" / "best.pt",
+    _REPO_ROOT / "runs" / "detect" / "yolo_defect_detection" / "defect_model_yolo11" / "weights" / "best.pt",
+]
+
+
+class YOLOModelError(Exception):
+    """Raised when the YOLO model cannot be loaded (missing ultralytics, or model file not found)."""
+    pass
+
 
 def _get_model(logger=None):
-    """Lazy-load YOLO model once."""
+    """Lazy-load YOLO model once. Raises YOLOModelError if ultralytics is missing or model file not found."""
     global _YOLO_MODEL
     if _YOLO_MODEL is not None:
         return _YOLO_MODEL
     if YOLO is None:
+        msg = "ultralytics.YOLO not available - install 'ultralytics' to enable inference"
         if logger:
-            logger.error("ultralytics.YOLO not available - install 'ultralytics' to enable inference")
-        return None
-    # Default path matches HQ backend; can override via env.
-    default_path = (
-        Path(__file__)
-        .resolve()
-        .parent.parent
-        / "runs"
-        / "detect"
-        / "yolo_defect_detection"
-        / "defect_model_yolo11"
-        / "weights"
-        / "best.pt"
-    )
-    model_path = os.getenv("VALLUM_YOLO_MODEL_PATH", str(default_path))
-    if logger:
-        logger.info(f"Loading YOLO model from {model_path}")
+            logger.error(msg)
+        raise YOLOModelError(msg)
+    model_path = os.getenv("VALLUM_YOLO_MODEL_PATH", "").strip()
+    if not model_path:
+        for p in _DEFAULT_MODEL_PATHS:
+            if os.path.exists(p):
+                model_path = str(p)
+                break
+        if not model_path:
+            tried = [str(p) for p in _DEFAULT_MODEL_PATHS]
+            msg = f"YOLO model file not found. Looked at: {tried}. Set VALLUM_YOLO_MODEL_PATH or copy best.pt to webapp/models/best.pt"
+            if logger:
+                logger.error(msg)
+            raise YOLOModelError(msg)
+    # Resolve in case env path is relative
+    model_path = str(Path(model_path).resolve())
     if not os.path.exists(model_path):
+        msg = f"YOLO model file not found at {model_path}"
         if logger:
-            logger.error(f"YOLO model file not found at {model_path}")
-        _YOLO_MODEL = None
-        return None
+            logger.error(msg)
+        raise YOLOModelError(msg)
+    if logger:
+        logger.info("Loading YOLO model from %s", model_path)
     _YOLO_MODEL = YOLO(model_path)
     if logger:
         try:
             names = list(_YOLO_MODEL.names.values())
-            logger.info(f"YOLO classes: {', '.join(names)}")
+            logger.info("YOLO classes: %s", ", ".join(names))
         except Exception:
             logger.info("YOLO model loaded")
     return _YOLO_MODEL
@@ -119,12 +135,7 @@ def run_inference_on_paths(image_paths: List[str], logger=None) -> Dict[str, Any
       - If all Normal (no detections), overall prediction = Normal, probability=1.0.
       - If any defect, overall prediction = Defect, probability = max confidence over all images.
     """
-    model = _get_model(logger)
-    if model is None:
-        # Fallback: stub Normal result so the rest of the pipeline still works.
-        if logger:
-            logger.warning("YOLO model not available - returning stub Normal result")
-        return {"defect_found": False, "prediction": "Normal", "probability": 1.0}
+    model = _get_model(logger)  # raises YOLOModelError if model missing or ultralytics not installed
 
     defect_found_any = False
     best_prob = 0.0
