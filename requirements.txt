@@ -16,7 +16,7 @@ pydantic
 
 # Inspection inference (YOLO + ball extraction).
 # Version constraints match VALLUM-NDT-ADR-BACKEND (setup_jetson.sh, src/training/yolo/requirements.txt).
-# On Jetson: run scripts/setup_jetson_inference.sh first to install PyTorch/torchvision from NVIDIA wheels (GPU).
+# On Jetson: run scripts/setup_jetson.sh once to install PyTorch/torchvision from NVIDIA wheels (GPU).
 numpy>=1.21.0
 opencv-python>=4.5.0
 Pillow>=9.0.0

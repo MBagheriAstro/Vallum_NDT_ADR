@@ -21,8 +21,8 @@ webapp/static/captures/
 # SQLite DB (created at runtime)
 webapp/inspection_history.db
 
-# Camera config override (set by scripts/set_camera_config.py)
+# Camera config override (set by scripts/camera_live_stream.py --save-config)
 webapp/camera_config.json
 
-# Jetson PyTorch/torchvision wheels (downloaded by scripts/setup_jetson_inference.sh)
+# Jetson PyTorch/torchvision wheels (downloaded by scripts/setup_jetson.sh)
 .jetson_wheels/

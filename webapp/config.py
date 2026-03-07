@@ -5,7 +5,7 @@ Paths are resolved relative to this package so the app works whether
 run from project root or from webapp/. All hardware pin mappings live here.
 
 Camera exposure/gains can be overridden by webapp/camera_config.json (written by
-scripts/set_camera_config.py when the server is off).
+scripts/camera_live_stream.py --save-config when you quit the live stream).
 """
 
 import json
@@ -61,7 +61,7 @@ CAMERA_CONFIG: dict[str, float] = {
 
 
 def _load_camera_config_file() -> None:
-    """Override CAMERA_CONFIG from file if present (set by scripts/set_camera_config.py)."""
+    """Override CAMERA_CONFIG from file if present (set by camera_live_stream.py --save-config)."""
     if not CAMERA_CONFIG_FILE.exists():
         return
     try:
